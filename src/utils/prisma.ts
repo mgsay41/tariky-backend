@@ -18,48 +18,85 @@ if (!process.env.DATABASE_URL) {
 // exhausting your database connection limit in serverless environments
 const globalForPrisma = global as unknown as { prisma: PrismaClient };
 
-// Create Prisma client with connection retry logic
-const prisma =
-  globalForPrisma.prisma ||
-  new PrismaClient({
-    log: process.env.NODE_ENV === "development" ? ["query", "info", "warn", "error"] : ["error"],
-    datasources: {
-      db: {
-        url: process.env.DATABASE_URL,
-      },
+// Configure Prisma client options
+const prismaClientOptions = {
+  log: process.env.NODE_ENV === "development" 
+    ? ["query", "info", "warn", "error"] 
+    : ["error"],
+  datasources: {
+    db: {
+      url: process.env.DATABASE_URL,
     },
-  });
+  },
+};
 
-// Save prisma client to global in non-production environments
+// In serverless environments, we need to handle connection pooling carefully
+// Create or reuse Prisma client instance
+const prisma = globalForPrisma.prisma || new PrismaClient({
+  log: process.env.NODE_ENV === "development" 
+    ? ['query', 'info', 'warn', 'error'] as const
+    : ['error'] as const,
+  datasources: {
+    db: {
+      url: process.env.DATABASE_URL,
+    },
+  },
+});
+
+// Save prisma client to global object to reuse connections
+// This is important for serverless environments to prevent connection exhaustion
 if (process.env.NODE_ENV !== "production") {
   globalForPrisma.prisma = prisma;
+} else {
+  // In production, we still want to cache the client but handle differently
+  if (!globalForPrisma.prisma) {
+    globalForPrisma.prisma = prisma;
+  }
 }
 
-// Connection testing function
-async function connectWithRetry(retries = 5, delay = 5000) {
+// Connection testing function with improved serverless handling
+async function connectWithRetry(retries = 3, delay = 3000) {
+  // In serverless environments, we don't want to retry too many times
+  // as it will increase cold start time
+  const serverlessRetries = process.env.NODE_ENV === 'production' ? 1 : retries;
+  const serverlessDelay = process.env.NODE_ENV === 'production' ? 1000 : delay;
+  
   let currentTry = 0;
   
-  while (currentTry < retries) {
+  while (currentTry < serverlessRetries) {
     try {
-      await prisma.$connect();
-      console.log("Successfully connected to the database");
-      return;
+      await prisma.$queryRaw`SELECT 1`;
+      if (process.env.NODE_ENV !== 'production') {
+        console.log("Successfully connected to the database");
+      }
+      return true;
     } catch (error) {
       currentTry++;
       console.error(`Database connection attempt ${currentTry} failed:`, error);
       
-      if (currentTry >= retries) {
+      if (currentTry >= serverlessRetries) {
         console.error("Max retries reached. Could not connect to database.");
-        throw error;
+        // In production, we don't want to throw an error as it will crash the serverless function
+        if (process.env.NODE_ENV !== 'production') {
+          throw error;
+        }
+        return false;
       }
       
-      console.log(`Retrying in ${delay}ms...`);
-      await new Promise(resolve => setTimeout(resolve, delay));
+      if (process.env.NODE_ENV !== 'production') {
+        console.log(`Retrying in ${serverlessDelay}ms...`);
+      }
+      await new Promise(resolve => setTimeout(resolve, serverlessDelay));
     }
   }
+  return false;
 }
 
-// Initialize connection
-connectWithRetry().catch(console.error);
+// Initialize connection in non-serverless environments
+if (process.env.NODE_ENV !== 'production') {
+  connectWithRetry().catch(console.error);
+}
 
+// Export the prisma client and the connection function
+export { connectWithRetry };
 export default prisma;

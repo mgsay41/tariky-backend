@@ -9,14 +9,23 @@ export class CourseController {
     try {
       // Check database connection before proceeding
       try {
-        await prisma.$queryRaw`SELECT 1`;
+        // Use a timeout to prevent hanging in serverless environments
+        const connectionPromise = prisma.$queryRaw`SELECT 1`;
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Database connection timeout')), 5000)
+        );
+        
+        await Promise.race([connectionPromise, timeoutPromise]);
       } catch (dbError) {
         console.error("Database connection error:", dbError);
         return sendError(res, "Database connection error. Please try again later.", 503);
       }
       
-      console.log("Database URL:", process.env.DATABASE_URL ? "Set" : "Not set");
-      console.log("Attempting to fetch courses...");
+      // Only log in non-production environments
+      if (process.env.NODE_ENV !== 'production') {
+        console.log("Database URL:", process.env.DATABASE_URL ? "Set" : "Not set");
+        console.log("Attempting to fetch courses...");
+      }
       const {
         page = "1",
         limit = "10",
@@ -150,16 +159,34 @@ export class CourseController {
         }
         // Authentication errors
         if ((error as { code?: string }).code === 'P1003') {
-          return sendError(res, "Database authentication failed. Please check your credentials.", 500);
+          return sendError(res, "Database authentication failed. Please try again later.", 500);
         }
         // Timeout errors
         if ((error as { code?: string }).code === 'P1008') {
           return sendError(res, "Database operation timed out. Please try again later.", 504);
         }
+        // Record not found
+        if ((error as { code?: string }).code === 'P2025') {
+          return sendError(res, "Requested resource not found.", 404);
+        }
+      }
+      
+      // Handle specific error types for serverless environments
+      const errorMessage = (error as Error).message || "";
+      
+      // Connection timeout errors
+      if (errorMessage.includes('timeout') || errorMessage.includes('timed out')) {
+        return sendError(res, "Database connection timed out. Please try again later.", 504);
+      }
+      
+      // Memory limit errors
+      if (errorMessage.includes('memory') || errorMessage.includes('heap')) {
+        return sendError(res, "Server resource limit reached. Please try again later.", 503);
       }
       
       // For serverless function errors, provide a more specific message
-      if ((error as {message?: string}).message?.includes('serverless')) {
+      if (errorMessage.includes('serverless') || errorMessage.includes('function') || 
+          errorMessage.includes('execution') || errorMessage.includes('lambda')) {
         return sendError(res, "Serverless function error. Please try again later.", 500);
       }
       
@@ -167,7 +194,7 @@ export class CourseController {
       return sendError(res, 
         process.env.NODE_ENV === 'production' 
           ? "An error occurred while fetching courses. Please try again later." 
-          : `Failed to fetch courses: ${(error as Error).message || "Unknown error"}`,
+          : `Failed to fetch courses: ${errorMessage || "Unknown error"}`,
         500
       );
     }

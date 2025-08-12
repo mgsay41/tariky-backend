@@ -69,12 +69,16 @@ app.use(notFound);
 app.use(errorHandler);
 
 // For local development, start the server if not in production
-let server;
 if (process.env.NODE_ENV !== 'production') {
-  server = app.listen(PORT, async () => {
+  const server = app.listen(PORT, async () => {
     try {
-      // Test database connection
-      await prisma.$queryRaw`SELECT 1`;
+      // Test database connection with timeout to prevent hanging
+      const connectionPromise = prisma.$queryRaw`SELECT 1`;
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Database connection timeout')), 5000)
+      );
+      
+      await Promise.race([connectionPromise, timeoutPromise]);
       console.log(`✅ Server running on port ${PORT}`);
       console.log(`✅ Database connection successful`);
       console.log(`✅ Environment: ${process.env.NODE_ENV || "development"}`);
