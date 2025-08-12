@@ -8,6 +8,13 @@ export const errorHandler = (
   next: NextFunction
 ) => {
   console.error("Error:", err);
+  console.error("Stack trace:", err.stack);
+
+  // Database connection errors
+  if (err.message && err.message.includes("connect")) {
+    console.error("Database connection error:", err.message);
+    return sendError(res, "Database connection error: " + err.message, 500);
+  }
 
   // Prisma errors
   if (err.code === "P2002") {
@@ -23,8 +30,12 @@ export const errorHandler = (
     return sendError(res, err.message, 400);
   }
 
-  // Default error
-  return sendError(res, "Internal Server Error", 500);
+  // Default error with more details
+  const errorMessage = process.env.NODE_ENV === "production" 
+    ? "Internal Server Error" 
+    : `Error: ${err.message || "Unknown error"}`;
+    
+  return sendError(res, errorMessage, 500);
 };
 
 export const notFound = (req: Request, res: Response) => {

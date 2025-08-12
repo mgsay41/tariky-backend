@@ -1,39 +1,24 @@
 import { PrismaClient } from "@prisma/client";
 import dotenv from "dotenv";
-import path from "path";
 
-// Load environment variables from the correct path
-dotenv.config({ path: path.resolve(process.cwd(), ".env") });
+// Load environment variables
+dotenv.config();
 
 // Check if DATABASE_URL is defined
 if (!process.env.DATABASE_URL) {
   console.error("DATABASE_URL is not defined in environment variables");
-  // Don't exit in production to allow serverless function to continue
-  if (process.env.NODE_ENV !== "production") {
-    process.exit(1);
-  }
+  process.exit(1);
 }
-
-// PrismaClient is attached to the `global` object in development to prevent
-// exhausting your database connection limit in serverless environments
-const globalForPrisma = global as unknown as { prisma: PrismaClient };
 
 // Create Prisma client with connection retry logic
-const prisma =
-  globalForPrisma.prisma ||
-  new PrismaClient({
-    log: process.env.NODE_ENV === "development" ? ["query", "info", "warn", "error"] : ["error"],
-    datasources: {
-      db: {
-        url: process.env.DATABASE_URL,
-      },
+const prisma = new PrismaClient({
+  log: ["query", "info", "warn", "error"],
+  datasources: {
+    db: {
+      url: process.env.DATABASE_URL,
     },
-  });
-
-// Save prisma client to global in non-production environments
-if (process.env.NODE_ENV !== "production") {
-  globalForPrisma.prisma = prisma;
-}
+  },
+});
 
 // Connection testing function
 async function connectWithRetry(retries = 5, delay = 5000) {

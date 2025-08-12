@@ -7,6 +7,16 @@ export class CourseController {
   // Get all courses (with filters or all if ?all=true)
   static async getAllCourses(req: Request, res: Response) {
     try {
+      // Check database connection before proceeding
+      try {
+        await prisma.$queryRaw`SELECT 1`;
+      } catch (dbError) {
+        console.error("Database connection error:", dbError);
+        return sendError(res, "Database connection error. Please try again later.", 503);
+      }
+      
+      console.log("Database URL:", process.env.DATABASE_URL ? "Set" : "Not set");
+      console.log("Attempting to fetch courses...");
       const {
         page = "1",
         limit = "10",
@@ -121,6 +131,7 @@ export class CourseController {
             totalPages: Math.ceil(totalCourses / (limitNum || fallbackLimit)),
           };
 
+      console.log("Successfully fetched courses:", formattedCourses.length);
       return sendSuccess(
         res,
         formattedCourses,
@@ -130,7 +141,35 @@ export class CourseController {
       );
     } catch (error) {
       console.error("Error fetching courses:", error);
-      return sendError(res, "Failed to fetch courses", 500);
+      
+      // Handle specific Prisma errors
+      if ((error as { code?: string }).code) {
+        // Connection errors
+        if ((error as { code?: string }).code === 'P1001' || (error as { code?: string }).code === 'P1002') {
+          return sendError(res, "Database connection error. Please try again later.", 503);
+        }
+        // Authentication errors
+        if ((error as { code?: string }).code === 'P1003') {
+          return sendError(res, "Database authentication failed. Please check your credentials.", 500);
+        }
+        // Timeout errors
+        if ((error as { code?: string }).code === 'P1008') {
+          return sendError(res, "Database operation timed out. Please try again later.", 504);
+        }
+      }
+      
+      // For serverless function errors, provide a more specific message
+      if ((error as {message?: string}).message?.includes('serverless')) {
+        return sendError(res, "Serverless function error. Please try again later.", 500);
+      }
+      
+      // Generic error handling
+      return sendError(res, 
+        process.env.NODE_ENV === 'production' 
+          ? "An error occurred while fetching courses. Please try again later." 
+          : `Failed to fetch courses: ${(error as Error).message || "Unknown error"}`,
+        500
+      );
     }
   }
 
