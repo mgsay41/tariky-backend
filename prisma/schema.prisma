@@ -1,0 +1,344 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Admin {
+  id              String      @id @default(cuid())
+  adminId         Int         @unique @default(autoincrement())
+  firstName       String
+  lastName        String
+  email           String      @unique
+  password        String
+  phoneNumber     String      @unique
+  profilePicture  String?
+  createdCourses  Course[]    @relation("CreatedCourses")
+  createdRoadmaps Roadmap[]   @relation("CreatedRoadmaps")
+  approvedCourseProviders CourseProvider[] @relation("ApprovedCourseProviders")
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  @@index([email, phoneNumber])
+}
+
+model User {
+  id              String        @id @default(cuid())
+  inceptumId      Int           @unique @default(autoincrement())
+  firstName       String
+  lastName        String
+  phoneNumber     String        @unique
+  profilePhoto    String?
+  email           String        @unique
+  password        String
+  age             Int
+  bio             String?       @db.Text
+  education       Education[]
+  enrolledCourses Course[]      @relation("UserCourses")
+  roadmaps        Roadmap[]     @relation("EnrolledRoadMaps")
+  certificates    Certificate[]
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@index([email, phoneNumber])
+}
+
+model CourseProvider {
+  id                 String               @id @default(cuid())
+  providerId         Int                  @unique @default(autoincrement())
+  companyName        String
+  companyDescription String?              @db.Text
+  website            String?
+  email              String               @unique
+  password           String
+  phoneNumber        String               @unique
+  address            String?
+  city               String?
+  country            String?
+  logo               String?
+  coverImage         String?
+  established        DateTime?
+  socialMediaLinks   Json?                // Store social media links as JSON
+  businessLicense    String?              // Business license/registration number
+  taxId              String?              // Tax identification number
+  rating             Float?               @default(0.0)
+  totalStudents      Int                  @default(0)
+  totalCourses       Int                  @default(0)
+  verified           Boolean              @default(false)
+  status             CourseProviderStatus @default(PENDING)
+  approvedBy         Admin?               @relation("ApprovedCourseProviders", fields: [adminId], references: [id])
+  adminId            String?
+  instructors        Instructor[]         @relation("ProviderInstructors")
+  courses            Course[]             @relation("ProviderCourses")
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+
+  @@index([email, phoneNumber, companyName])
+}
+
+model Education {
+  id               Int      @id @default(autoincrement())
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId           String
+  university       String
+  college          String
+  department       String
+  yearOfGraduation Int
+  degree           String
+  universityId     String
+  photo            String?
+
+  @@index([userId])
+}
+
+model Certificate {
+  id        Int      @id @default(autoincrement())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  name      String
+  file      String
+  issueDate DateTime
+  institute String
+
+  @@index([userId])
+}
+
+model Course {
+  id                 Int             @id @default(autoincrement())
+  title              String
+  slug               String          @unique // Auto-generated from title (e.g., "web_dev")
+  description        String?         @db.Text
+  shortDescription   String?         // Brief summary for cards/listings
+  courseImage        String?         // Course thumbnail/cover image
+  courseFee          Decimal         @db.Decimal(10, 2) // Course price
+  paymentLink        String?         // Payment link for course enrollment
+  rating             Float?          @default(0.0) // Average rating out of 5
+  totalRatings       Int             @default(0)   // Number of ratings
+  level              CourseLevel     @default(BEGINNER)
+  duration           Int             // Duration in hours
+  courseType         CourseType      @default(ONLINE)
+  language           String          @default("English")
+  
+  // Location fields (for offline courses)
+  address            String?
+  city               String?
+  country            String?
+  venue              String?
+  
+  // Course structure
+  totalLessons       Int?            // Number of lessons/modules
+  totalProjects      Int?            @default(0)
+  hasCapstoneProject Boolean         @default(false)
+  hasCertificate     Boolean         @default(true)
+  
+  // Prerequisites and outcomes
+  prerequisites      String[]        // Array of prerequisites
+  learningOutcomes   String[]        // What students will learn
+  courseOutline      String?         @db.Text // Detailed course structure
+  
+  // Enrollment details
+  maxStudents        Int?            // Maximum enrollment capacity
+  currentStudents    Int             @default(0)
+  startDate          DateTime?       // Course start date
+  endDate            DateTime?       // Course end date
+  enrollmentDeadline DateTime?       // Last date to enroll
+  
+  // Relationships
+  instructor         Instructor?     @relation("InstructorCourses", fields: [instructorId], references: [id])
+  instructorId       String?
+  courseProvider     CourseProvider? @relation("ProviderCourses", fields: [courseProviderId], references: [id])
+  courseProviderId   String?
+  roadmap            Roadmap?        @relation(fields: [roadmapId], references: [id], onDelete: SetNull)
+  roadmapId          Int?
+  createdBy          Admin           @relation("CreatedCourses", fields: [adminId], references: [id])
+  adminId            String
+  category           CourseCategory  @relation(fields: [categoryId], references: [id])
+  categoryId         Int
+  
+  status             CourseStatus    @default(PENDING)
+  enrolledStudents   User[]          @relation("UserCourses")
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime?        @updatedAt
+
+  @@index([slug, instructorId, roadmapId, adminId, courseProviderId, categoryId])
+  @@index([level, courseType, rating])
+}
+
+model CourseCategory {
+  id          Int       @id @default(autoincrement())
+  name        String    @unique
+  slug        String    @unique
+  description String?   @db.Text
+  icon        String?   // Icon identifier or URL
+  color       String?   // Category color for UI
+  courses     Course[]
+  roadmaps    Roadmap[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([slug])
+}
+
+model Roadmap {
+  id               Int           @id @default(autoincrement())
+  title            String
+  slug             String        @unique // Auto-generated from title
+  description      String?       @db.Text
+  shortDescription String?       // Brief summary
+  roadmapImage     String?       // Roadmap cover image
+  level            CourseLevel   @default(BEGINNER)
+  estimatedDuration Int?         // Total estimated hours to complete
+  totalCourses     Int           @default(0)
+  
+  // Learning path details
+  prerequisites    String[]      // What students should know before starting
+  learningGoals    String[]      // What students will achieve
+  careerOutcomes   String[]      // Career opportunities after completion
+  
+  // Roadmap structure
+  sequence         Int[]         // Order of course IDs in the roadmap
+  isLinear         Boolean       @default(true) // Must complete courses in order
+  
+  // Relationships
+  createdBy        Admin         @relation("CreatedRoadmaps", fields: [adminId], references: [id])
+  adminId          String
+  instructors      Instructor[]  @relation("InstructorRoadMaps")
+  courses          Course[]
+  students         User[]        @relation("EnrolledRoadMaps")
+  category         CourseCategory @relation(fields: [categoryId], references: [id])
+  categoryId       Int
+  
+  status           RoadmapStatus @default(PENDING)
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  @@index([slug, adminId, categoryId])
+  @@index([level, status])
+}
+
+model Instructor {
+  id               String          @id @default(cuid())
+  instructorId     Int             @unique @default(autoincrement())
+  profilePicture   String?
+  firstName        String
+  lastName         String
+  phoneNumber      String          @unique
+  instructorClass  InstructorClass
+  email            String          @unique
+  password         String
+  age              Int
+  rating           Float?          @default(0.0)
+  totalRatings     Int             @default(0)
+  cv               String?
+  bio              String?         @db.Text
+  specialization   String?         // Area of expertise
+  experience       Int?            // Years of experience
+  expertise        String[]        // Array of skills/technologies
+  certifications   String[]        // Professional certifications
+  
+  // Social links
+  linkedinUrl      String?
+  githubUrl        String?
+  portfolioUrl     String?
+  
+  // Instructor metrics
+  totalStudents    Int             @default(0)
+  totalCourses     Int             @default(0)
+  
+  courseProvider   CourseProvider? @relation("ProviderInstructors", fields: [courseProviderId], references: [id])
+  courseProviderId String?
+  courses          Course[]        @relation("InstructorCourses")
+  roadMaps         Roadmap[]       @relation("InstructorRoadMaps")
+  courseRequests   CourseRequest[]
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+
+  @@index([email, phoneNumber, courseProviderId])
+  @@index([rating, experience])
+}
+
+model CourseRequest {
+  id               Int           @id @default(autoincrement())
+  title            String
+  description      String?       @db.Text
+  roadmapName      String?
+  duration         Int           // Duration in hours
+  courseOutline    String?       @db.Text
+  courseFee        Decimal?      @db.Decimal(10, 2)
+  paymentLink      String?       // Payment link for the course request
+  level            CourseLevel   @default(BEGINNER)
+  courseType       CourseType    @default(ONLINE)
+  
+  // Location details (for offline courses)
+  location         String?
+  address          String?
+  city             String?
+  country          String?
+  
+  startDate        DateTime
+  endDate          DateTime?
+  courseImage      String?
+  numberOfSessions Int
+  sessionDuration  Int           // Duration per session in minutes
+  maxStudents      Int?
+  
+  instructor       Instructor    @relation(fields: [instructorId], references: [id])
+  instructorId     String
+  status           RequestStatus @default(PENDING)
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  @@index([instructorId, status])
+}
+
+// Enums
+enum InstructorClass {
+  A
+  B
+  C
+}
+
+enum RequestStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+}
+
+enum CourseStatus {
+  PENDING
+  APPROVED
+  PUBLISHED
+  REJECTED
+  ARCHIVED
+}
+
+enum RoadmapStatus {
+  PENDING
+  APPROVED
+  PUBLISHED
+  REJECTED
+  ARCHIVED
+}
+
+enum CourseProviderStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  SUSPENDED
+}
+
+enum CourseLevel {
+  BEGINNER
+  INTERMEDIATE
+  ADVANCED
+  EXPERT
+}
+
+enum CourseType {
+  ONLINE
+  OFFLINE
+  HYBRID
+}
