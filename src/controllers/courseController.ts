@@ -274,59 +274,114 @@ export class CourseController {
     }
   }
 
-  // Enroll in a course
-  static async enrollInCourse(req: Request, res: Response) {
+  // Submit course enrollment request
+  static async submitEnrollment(req: Request, res: Response) {
     try {
-      const { id } = req.params;
-      const { userId, name, phoneNumber, college, semester } = req.body;
+      const { courseId } = req.params;
+      const { clerkId } = req.body;
 
-      if (!id || !userId || !name || !phoneNumber) {
-        return sendError(res, "Missing required fields", 400);
+      // Validate required fields
+      if (!courseId) {
+        return sendError(res, "Course ID is required", 400);
+      }
+
+      if (!clerkId) {
+        return sendError(res, "User authentication required (clerkId missing)", 400);
+      }
+
+      // Get user from database using clerkId
+      const user = await prisma.user.findUnique({
+        where: { clerkId },
+      });
+
+      if (!user) {
+        return sendError(res, "User not found. Please complete registration.", 404);
+      }
+
+      if (!user.isProfileComplete) {
+        return sendError(
+          res,
+          "User profile incomplete. Please complete onboarding first.",
+          400
+        );
       }
 
       // Check if course exists and is published
       const course = await prisma.course.findFirst({
         where: {
-          id: parseInt(id),
-          status: "PUBLISHED"
-        }
+          id: parseInt(courseId),
+          status: "PUBLISHED",
+        },
+        select: {
+          id: true,
+          title: true,
+          slug: true,
+          courseImage: true,
+          paymentLink: true,
+        },
       });
 
       if (!course) {
-        return sendError(res, "Course not found", 404);
+        return sendError(
+          res,
+          "Course not found or not available for enrollment",
+          404
+        );
       }
 
-      // Check if user is already enrolled
-      const existingEnrollment = await prisma.course.findFirst({
+      // Check if user already has a pending enrollment for this course
+      const existingEnrollment = await prisma.courseEnrollment.findFirst({
         where: {
-          id: parseInt(id),
-          enrolledStudents: {
-            some: {
-              id: userId
-            }
-          }
-        }
+          courseId: parseInt(courseId),
+          email: user.email,
+          status: {
+            in: ["PENDING", "CONTACTED"],
+          },
+        },
       });
 
       if (existingEnrollment) {
-        return sendError(res, "Already enrolled in this course", 400);
+        return sendError(
+          res,
+          "You already have a pending enrollment request for this course",
+          400
+        );
       }
 
-      // Enroll the user
-      await prisma.course.update({
-        where: { id: parseInt(id) },
+      // Create enrollment request using user's stored data
+      const enrollment = await prisma.courseEnrollment.create({
         data: {
-          enrolledStudents: {
-            connect: { id: userId }
+          name: `${user.firstName} ${user.lastName}`,
+          email: user.email,
+          phoneNumber: user.phoneNumber!,
+          college: user.college!,
+          semester: user.semester!,
+          university: user.university!,
+          courseId: parseInt(courseId),
+          status: "PENDING",
+        },
+        include: {
+          course: {
+            select: {
+              id: true,
+              title: true,
+              slug: true,
+              courseImage: true,
+              paymentLink: true,
+            },
           },
-          currentStudents: { increment: 1 }
-        }
+        },
       });
 
-      return sendSuccess(res, null, "Successfully enrolled in course");
+      return sendSuccess(
+        res,
+        enrollment,
+        "Enrollment request submitted successfully. Our sales team will contact you soon!",
+        201
+      );
     } catch (error) {
-      console.error("Error enrolling in course:", error);
-      return sendError(res, "Failed to enroll in course", 500);
+      console.error("Error submitting enrollment:", error);
+      return sendError(res, "Failed to submit enrollment request", 500);
     }
   }
 }

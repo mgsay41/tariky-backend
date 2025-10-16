@@ -7,6 +7,8 @@ import path from "path";
 
 // Import routes
 import courseRoutes from "./routes/courseRoutes";
+import userRoutes from "./routes/userRoutes";
+import webhookRoutes from "./routes/webhookRoutes";
 
 // Import middleware
 import { errorHandler, notFound } from "./middleware/errorHandler";
@@ -61,6 +63,8 @@ app.get("/health", (req, res) => {
 
 // API routes
 app.use("/api/courses", courseRoutes);
+app.use("/api/users", userRoutes);
+app.use("/api/webhooks", webhookRoutes);
 
 // 404 handler
 app.use(notFound);

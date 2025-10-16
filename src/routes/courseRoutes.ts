@@ -12,7 +12,7 @@ router.get("/categories", CourseController.getCategories);
 // GET /api/courses/:slug - Get course by slug
 router.get("/:slug", CourseController.getCourseBySlug);
 
-// POST /api/courses/:id/enroll - Enroll in a course
-router.post("/:id/enroll", CourseController.enrollInCourse);
+// POST /api/courses/:courseId/enroll - Submit enrollment request
+router.post("/:courseId/enroll", CourseController.submitEnrollment);
 
 export default router;

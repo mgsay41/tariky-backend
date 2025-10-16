@@ -27,15 +27,23 @@ model Admin {
 
 model User {
   id              String        @id @default(cuid())
+  clerkId         String        @unique  // NEW: Clerk user ID
   inceptumId      Int           @unique @default(autoincrement())
   firstName       String
   lastName        String
-  phoneNumber     String        @unique
+  phoneNumber     String?       @unique  // CHANGE: Make optional initially
   profilePhoto    String?
   email           String        @unique
-  password        String
-  age             Int
+  password        String?       // CHANGE: Make optional (OAuth users don't have password)
+  age             Int?          // CHANGE: Make optional
   bio             String?       @db.Text
+
+  // NEW: Onboarding fields
+  college         String?
+  semester        String?
+  university      String?
+  isProfileComplete Boolean     @default(false)  // NEW: Track if onboarding is done
+
   education       Education[]
   enrolledCourses Course[]      @relation("UserCourses")
   roadmaps        Roadmap[]     @relation("EnrolledRoadMaps")
@@ -43,7 +51,7 @@ model User {
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
 
-  @@index([email, phoneNumber])
+  @@index([email, phoneNumber, clerkId])
 }
 
 model CourseProvider {
@@ -121,31 +129,31 @@ model Course {
   duration           Int             // Duration in hours
   courseType         CourseType      @default(ONLINE)
   language           String          @default("English")
-  
+
   // Location fields (for offline courses)
   address            String?
   city               String?
   country            String?
   venue              String?
-  
+
   // Course structure
   totalLessons       Int?            // Number of lessons/modules
   totalProjects      Int?            @default(0)
   hasCapstoneProject Boolean         @default(false)
   hasCertificate     Boolean         @default(true)
-  
+
   // Prerequisites and outcomes
   prerequisites      String[]        // Array of prerequisites
   learningOutcomes   String[]        // What students will learn
   courseOutline      String?         @db.Text // Detailed course structure
-  
+
   // Enrollment details
   maxStudents        Int?            // Maximum enrollment capacity
   currentStudents    Int             @default(0)
   startDate          DateTime?       // Course start date
   endDate            DateTime?       // Course end date
   enrollmentDeadline DateTime?       // Last date to enroll
-  
+
   // Relationships
   instructor         Instructor?     @relation("InstructorCourses", fields: [instructorId], references: [id])
   instructorId       String?
@@ -157,9 +165,10 @@ model Course {
   adminId            String
   category           CourseCategory  @relation(fields: [categoryId], references: [id])
   categoryId         Int
-  
+
   status             CourseStatus    @default(PENDING)
   enrolledStudents   User[]          @relation("UserCourses")
+  enrollmentRequests CourseEnrollment[]
   createdAt          DateTime        @default(now())
   updatedAt          DateTime?        @updatedAt
 
@@ -271,20 +280,20 @@ model CourseRequest {
   paymentLink      String?       // Payment link for the course request
   level            CourseLevel   @default(BEGINNER)
   courseType       CourseType    @default(ONLINE)
-  
+
   // Location details (for offline courses)
   location         String?
   address          String?
   city             String?
   country          String?
-  
+
   startDate        DateTime
   endDate          DateTime?
   courseImage      String?
   numberOfSessions Int
   sessionDuration  Int           // Duration per session in minutes
   maxStudents      Int?
-  
+
   instructor       Instructor    @relation(fields: [instructorId], references: [id])
   instructorId     String
   status           RequestStatus @default(PENDING)
@@ -292,6 +301,32 @@ model CourseRequest {
   updatedAt        DateTime      @updatedAt
 
   @@index([instructorId, status])
+}
+
+model CourseEnrollment {
+  id              Int      @id @default(autoincrement())
+  name            String
+  email           String
+  phoneNumber     String   // WhatsApp number
+  college         String
+  semester        String
+  university      String
+
+  // Course information
+  course          Course   @relation(fields: [courseId], references: [id])
+  courseId        Int
+
+  // Status tracking for sales team
+  status          EnrollmentStatus @default(PENDING)
+  notes           String?  @db.Text // For sales team notes
+  contactedAt     DateTime?
+  contactedBy     String?  // Sales team member who contacted
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([courseId, status])
+  @@index([email, phoneNumber])
 }
 
 // Enums
@@ -341,4 +376,11 @@ enum CourseType {
   ONLINE
   OFFLINE
   HYBRID
+}
+
+enum EnrollmentStatus {
+  PENDING
+  CONTACTED
+  ENROLLED
+  REJECTED
 }
