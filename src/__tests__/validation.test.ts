@@ -9,34 +9,34 @@
 
 describe('Validation Tests', () => {
   describe('Phone Number Validation', () => {
-    const validateEthiopianPhoneNumber = (phoneNumber: string): boolean => {
-      // Ethiopian phone number format: +251XXXXXXXXX (9 digits after +251)
-      const ethiopianPhoneRegex = /^\+251[0-9]{9}$/;
-      return ethiopianPhoneRegex.test(phoneNumber);
+    const validateEgyptianPhoneNumber = (phoneNumber: string): boolean => {
+      // Egyptian phone number format: +20XXXXXXXXXX (10 digits after +20)
+      const egyptianPhoneRegex = /^\+20[0-9]{10}$/;
+      return egyptianPhoneRegex.test(phoneNumber);
     };
 
-    it('should accept valid Ethiopian phone number', () => {
+    it('should accept valid Egyptian phone number', () => {
       const validNumbers = [
-        '+251912345678',
-        '+251911111111',
-        '+251923456789',
-        '+251900000000',
+        '+201012345678',
+        '+201111111111',
+        '+201234567890',
+        '+201000000000',
       ];
 
       validNumbers.forEach((number) => {
-        expect(validateEthiopianPhoneNumber(number)).toBe(true);
+        expect(validateEgyptianPhoneNumber(number)).toBe(true);
       });
     });
 
-    it('should reject invalid Ethiopian phone numbers', () => {
+    it('should reject invalid Egyptian phone numbers', () => {
       const invalidNumbers = [
-        '0912345678',         // Missing +251
-        '+25191234567',       // Too few digits
-        '+2519123456789',     // Too many digits
-        '251912345678',       // Missing +
-        '+251-912-345-678',   // Contains dashes
-        '+251 912 345 678',   // Contains spaces
-        '+252912345678',      // Wrong country code
+        '01012345678',        // Missing +20
+        '+20101234567',       // Too few digits
+        '+2010123456789',     // Too many digits
+        '201012345678',       // Missing +
+        '+20-101-234-5678',   // Contains dashes
+        '+20 101 234 5678',   // Contains spaces
+        '+211012345678',      // Wrong country code
         'invalid',            // Not a number
         '',                   // Empty string
         null,                 // Null
@@ -44,13 +44,13 @@ describe('Validation Tests', () => {
       ];
 
       invalidNumbers.forEach((number) => {
-        expect(validateEthiopianPhoneNumber(number as any)).toBe(false);
+        expect(validateEgyptianPhoneNumber(number as any)).toBe(false);
       });
     });
 
     it('should handle edge cases', () => {
-      expect(validateEthiopianPhoneNumber('+251000000000')).toBe(true); // All zeros
-      expect(validateEthiopianPhoneNumber('+251999999999')).toBe(true); // All nines
+      expect(validateEgyptianPhoneNumber('+200000000000')).toBe(true); // All zeros
+      expect(validateEgyptianPhoneNumber('+209999999999')).toBe(true); // All nines
     });
   });
 
@@ -75,8 +75,8 @@ describe('Validation Tests', () => {
 
     it('should validate all required fields are present', () => {
       const data = {
-        phoneNumber: '+251912345678',
-        university: 'Addis Ababa University',
+        phoneNumber: '+201012345678',
+        university: 'Cairo University',
         college: 'Engineering',
         semester: 'Year 3',
       };
@@ -94,8 +94,8 @@ describe('Validation Tests', () => {
 
     it('should detect missing required fields', () => {
       const data = {
-        phoneNumber: '+251912345678',
-        university: 'Addis Ababa University',
+        phoneNumber: '+201012345678',
+        university: 'Cairo University',
         // Missing college and semester
       };
 
@@ -113,7 +113,7 @@ describe('Validation Tests', () => {
 
     it('should treat empty strings as missing', () => {
       const data = {
-        phoneNumber: '+251912345678',
+        phoneNumber: '+201012345678',
         university: '',
         college: '   ',
         semester: 'Year 3',
@@ -133,7 +133,7 @@ describe('Validation Tests', () => {
 
     it('should handle null and undefined values', () => {
       const data = {
-        phoneNumber: '+251912345678',
+        phoneNumber: '+201012345678',
         university: null,
         college: undefined,
         semester: 'Year 3',
@@ -232,8 +232,8 @@ describe('Validation Tests', () => {
       if (!data.semester) errors.push('Semester is required');
 
       // Phone number format
-      if (data.phoneNumber && !/^\+251[0-9]{9}$/.test(data.phoneNumber)) {
-        errors.push('Invalid Ethiopian phone number format. Use: +251XXXXXXXXX');
+      if (data.phoneNumber && !/^\+20[0-9]{10}$/.test(data.phoneNumber)) {
+        errors.push('Invalid Egyptian phone number format. Use: +20XXXXXXXXXX');
       }
 
       // Minimum length validations
@@ -255,8 +255,8 @@ describe('Validation Tests', () => {
 
     it('should validate complete onboarding data', () => {
       const onboardingData = {
-        phoneNumber: '+251912345678',
-        university: 'Addis Ababa University',
+        phoneNumber: '+201012345678',
+        university: 'Cairo University',
         college: 'Engineering',
         semester: 'Year 3, Semester 1',
       };

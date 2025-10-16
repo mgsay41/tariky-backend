@@ -150,12 +150,12 @@ export class UserController {
         );
       }
 
-      // Validate phone number format (Ethiopian: +251XXXXXXXXX)
-      const phoneRegex = /^\+251[0-9]{9}$/;
+      // Validate phone number format (Egyptian: +20XXXXXXXXXX)
+      const phoneRegex = /^\+20[0-9]{10}$/;
       if (!phoneRegex.test(phoneNumber)) {
         return sendError(
           res,
-          "Invalid Ethiopian phone number format. Expected: +251XXXXXXXXX",
+          "Invalid Egyptian phone number format. Expected: +20XXXXXXXXXX",
           400
         );
       }
